@@ -1,0 +1,19 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <Company>smx27</Company>
+    <Authors>smx27</Authors>
+    <Product>Smx27.DynamicMapper</Product>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/smx27/smx27.DynamicMapper</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/smx27/smx27.DynamicMapper</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+  </PropertyGroup>
+</Project>

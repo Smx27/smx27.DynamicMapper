@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Smx27.DynamicMapper.Abstractions</PackageId>
+    <Description>Interfaces and base types for Smx27.DynamicMapper</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+</Project>
