@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Smx27.DynamicMapper.Extensions</PackageId>
+    <Description>Extensions for Smx27.DynamicMapper (ASP.NET Core, etc.)</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Smx27.DynamicMapper\Smx27.DynamicMapper.csproj" />
+  </ItemGroup>
+
+  <!-- Conditional ASP.NET Core reference -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+  </ItemGroup>
+</Project>

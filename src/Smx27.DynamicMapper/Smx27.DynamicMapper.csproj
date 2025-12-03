@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Smx27.DynamicMapper</PackageId>
+    <Description>A dynamic mapping library for .NET with JSON-based configuration</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <ProjectReference Include="..\Smx27.DynamicMapper.Abstractions\Smx27.DynamicMapper.Abstractions.csproj" />
+  </ItemGroup>
+</Project>
