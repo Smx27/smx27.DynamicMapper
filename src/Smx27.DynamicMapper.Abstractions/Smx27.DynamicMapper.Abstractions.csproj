@@ -4,4 +4,8 @@
     <Description>Interfaces and base types for Smx27.DynamicMapper</Description>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
 </Project>
