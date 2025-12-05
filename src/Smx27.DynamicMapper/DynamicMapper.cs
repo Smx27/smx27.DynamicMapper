@@ -6,6 +6,7 @@ using System.Reflection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Smx27.DynamicMapper.Abstractions;
+using Smx27.DynamicMapper.Abstractions.Exceptions;
 
 namespace Smx27.DynamicMapper;
 
@@ -126,10 +127,15 @@ public class DynamicMapper : IDynamicMapper
             if (mapping != null && mapping.PropertyMappings.Any())
             {
                 ApplyConfiguredMapping(source, destination, mapping);
+
+                // Handle dynamic properties based on configuration
+                HandleDynamicProperties(
+                    source, destination, mapping,
+                    sourceProperties, destProperties);
             }
             else
             {
-                // Fallback to convention-based mapping (by property name)
+                // Fallback to convention-based mapping
                 ApplyConventionMapping(source, destination, sourceProperties, destProperties);
             }
 
@@ -241,6 +247,25 @@ public class DynamicMapper : IDynamicMapper
             if (_configuration.Mappings.TryGetValue(mappingKey, out var mapping))
                 return mapping;
 
+            // Fallback: search all mappings with type resolution
+            foreach (var m in _configuration.Mappings.Values)
+            {
+                var mSourceType = Type.GetType(m.SourceType);
+                var mDestType = Type.GetType(m.DestinationType);
+
+                if (mSourceType != null && mDestType != null)
+                {
+                    // Check if mapping is applicable
+                    // Source: mapping source type must be assignable from actual source type (e.g. mapping for Object handles any object)
+                    // Destination: requested destination type must be assignable from mapping destination type
+                    if (mSourceType.IsAssignableFrom(sourceType) &&
+                        destinationType.IsAssignableFrom(mDestType))
+                    {
+                        return m;
+                    }
+                }
+            }
+
             return null;
         }
 
@@ -255,6 +280,162 @@ public class DynamicMapper : IDynamicMapper
             }
 
             return expando;
+        }
+
+        private void HandleDynamicProperties(
+            object source,
+            object destination,
+            TypeMapping mapping,
+            PropertyInfo[] sourceProperties,
+            PropertyInfo[] destProperties)
+        {
+            if (mapping?.DynamicSettings == null)
+                return;
+
+            // Get properties that were mapped by configuration
+            var mappedSourceProps = mapping.PropertyMappings
+                .Select(pm => pm.SourceProperty)
+                .ToHashSet();
+
+            // Get unmapped source properties
+            var unmappedSourceProps = sourceProperties
+                .Where(sp => !mappedSourceProps.Contains(sp.Name))
+                .ToList();
+
+            if (!unmappedSourceProps.Any())
+                return;
+
+            switch (mapping.DynamicSettings.Behavior)
+            {
+                case DynamicMappingBehavior.Ignore:
+                    // Do nothing - default
+                    break;
+
+                case DynamicMappingBehavior.StoreInDictionary:
+                    StoreInDictionary(destination, unmappedSourceProps, source, mapping);
+                    break;
+
+                case DynamicMappingBehavior.StoreInJObject:
+                    StoreInJObject(destination, unmappedSourceProps, source, mapping);
+                    break;
+
+                case DynamicMappingBehavior.ThrowException:
+                    ThrowForUnmappedProperties(unmappedSourceProps);
+                    break;
+            }
+        }
+
+        private void StoreInDictionary(
+            object destination,
+            List<PropertyInfo> unmappedProps,
+            object source,
+            TypeMapping mapping)
+        {
+            PropertyInfo? dictProp = null;
+            if (!string.IsNullOrEmpty(mapping.DynamicSettings.DictionaryPropertyName))
+            {
+                dictProp = destination.GetType().GetProperty(
+                    mapping.DynamicSettings.DictionaryPropertyName);
+            }
+
+            if (dictProp == null)
+            {
+                // Try to find a property that implements IDictionary<string, object>
+                dictProp = FindDictionaryProperty(destination.GetType());
+                if (dictProp == null)
+                    return; // Silently ignore if no dictionary property found
+            }
+
+            // Get or create dictionary
+            var dict = GetOrCreateDictionary(dictProp, destination);
+
+            foreach (var prop in unmappedProps)
+            {
+                var value = prop.GetValue(source);
+                if (value != null)
+                {
+                    dict[prop.Name] = value;
+                }
+            }
+
+            // Set the dictionary back
+            dictProp.SetValue(destination, dict);
+        }
+
+        private void StoreInJObject(
+            object destination,
+            List<PropertyInfo> unmappedProps,
+            object source,
+            TypeMapping mapping)
+        {
+            PropertyInfo? jObjectProp = null;
+            if (!string.IsNullOrEmpty(mapping.DynamicSettings.JObjectPropertyName))
+            {
+                jObjectProp = destination.GetType().GetProperty(
+                    mapping.DynamicSettings.JObjectPropertyName);
+            }
+
+            if (jObjectProp == null ||
+                jObjectProp.PropertyType != typeof(JObject))
+                return;
+
+            // Get or create JObject
+            var jObject = (JObject?)jObjectProp.GetValue(destination) ?? new JObject();
+
+            foreach (var prop in unmappedProps)
+            {
+                var value = prop.GetValue(source);
+                if (value != null)
+                {
+                    jObject[prop.Name] = JToken.FromObject(value);
+                }
+            }
+
+            jObjectProp.SetValue(destination, jObject);
+        }
+
+        private void ThrowForUnmappedProperties(List<PropertyInfo> unmappedProps)
+        {
+            if (unmappedProps.Any())
+            {
+                var propNames = string.Join(", ", unmappedProps.Select(p => p.Name));
+                throw new UnmappedPropertyException(
+                    $"Unmapped properties found: {propNames}");
+            }
+        }
+
+        private IDictionary<string, object> GetOrCreateDictionary(
+            PropertyInfo dictProp,
+            object destination)
+        {
+            var dict = dictProp.GetValue(destination) as IDictionary<string, object>;
+
+            if (dict == null)
+            {
+                // Try to create appropriate dictionary type
+                var dictType = dictProp.PropertyType;
+                if (dictType.IsInterface || dictType.IsAbstract)
+                {
+                    dict = new Dictionary<string, object>();
+                }
+                else
+                {
+                    var instance = Activator.CreateInstance(dictType);
+                    if (instance == null)
+                        throw new InvalidOperationException($"Could not create dictionary instance of type {dictType.Name}");
+                    dict = (IDictionary<string, object>)instance;
+                }
+            }
+
+            return dict!;
+        }
+
+        private PropertyInfo? FindDictionaryProperty(Type type)
+        {
+            return type.GetProperties()
+                .FirstOrDefault(p =>
+                    p.PropertyType.IsAssignableFrom(typeof(IDictionary<string, object>)) ||
+                    p.PropertyType.IsAssignableFrom(typeof(Dictionary<string, object>)));
         }
 
     #endregion
