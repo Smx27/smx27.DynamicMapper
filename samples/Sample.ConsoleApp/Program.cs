@@ -94,8 +94,94 @@ class Program
         Console.WriteLine($"Name: {dynamicResult.Name}");
         Console.WriteLine($"EmailAddress: {dynamicResult.EmailAddress}");
 
+        // Add after existing tests
+        Console.WriteLine("\n\nTesting Dynamic Property Handling");
+        Console.WriteLine("==================================");
+
+        // Test with dictionary storage
+        var dynamicSource = new
+        {
+            Id = 100,
+            Name = "Dynamic Test",
+            ExtraField1 = "This is extra",
+            ExtraField2 = 123.45,
+            ExtraField3 = DateTime.UtcNow
+        };
+
+        var dynamicConfig = @"{
+            ""Mappings"": {
+                ""Object_DestinationModel"": {
+                    ""Name"": ""Object_DestinationModel"",
+                    ""SourceType"": ""System.Object"",
+                    ""DestinationType"": ""Sample.ConsoleApp.Models.DestinationModel, Sample.ConsoleApp"",
+                    ""PropertyMappings"": [
+                        { ""SourceProperty"": ""Id"", ""DestinationProperty"": ""Id"" },
+                        { ""SourceProperty"": ""Name"", ""DestinationProperty"": ""FullName"" }
+                    ],
+                    ""DynamicSettings"": {
+                        ""Behavior"": ""StoreInDictionary"",
+                        ""DictionaryPropertyName"": ""ExtendedProperties""
+                    }
+                }
+            }
+        }";
+
+        var dynamicMapper = new DynamicMapperBuilder()
+            .WithJsonConfiguration(dynamicConfig)
+            .Build();
+
+        try
+        {
+            // We need a destination type with dictionary property
+            var result = MapWithDictionary(dynamicSource, dynamicMapper);
+            Console.WriteLine("\nDynamic mapping with dictionary storage successful!");
+            Console.WriteLine($"Extra properties stored: {result.ExtendedProperties?.Count ?? 0}");
+            if (result.ExtendedProperties != null)
+            {
+                foreach (var prop in result.ExtendedProperties)
+                {
+                    Console.WriteLine($"  {prop.Key}: {prop.Value}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Dynamic mapping failed: {ex.Message}");
+            Console.WriteLine(ex.StackTrace);
+        }
+
         Console.WriteLine("\nPress any key to exit...");
         // Removed Console.ReadKey() to avoid blocking in non-interactive environment
         // Console.ReadKey();
+    }
+
+    public class DestinationWithDictionary : DestinationModel
+    {
+        public Dictionary<string, object> ExtendedProperties { get; set; } = new();
+    }
+
+    private static DestinationWithDictionary MapWithDictionary(object source, IDynamicMapper mapper)
+    {
+        // Create a modified configuration for the new type
+        var config = @"{
+            ""Mappings"": {
+                ""Object_DestinationWithDictionary"": {
+                    ""Name"": ""Object_DestinationWithDictionary"",
+                    ""SourceType"": ""System.Object"",
+                    ""DestinationType"": ""Sample.ConsoleApp.Program+DestinationWithDictionary, Sample.ConsoleApp"",
+                    ""PropertyMappings"": [
+                        { ""SourceProperty"": ""Id"", ""DestinationProperty"": ""Id"" },
+                        { ""SourceProperty"": ""Name"", ""DestinationProperty"": ""FullName"" }
+                    ],
+                    ""DynamicSettings"": {
+                        ""Behavior"": ""StoreInDictionary"",
+                        ""DictionaryPropertyName"": ""ExtendedProperties""
+                    }
+                }
+            }
+        }";
+
+        mapper.ReloadConfiguration(config);
+        return mapper.Map<DestinationWithDictionary>(source);
     }
 }
